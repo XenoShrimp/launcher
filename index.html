@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Launcher</title>
+<style>
+  :root {
+    --bg: #000;
+    --surface: #111;
+    --border: #2a2a2a;
+    --text: #fff;
+    --sub: #888;
+    --hover: #1c1c1c;
+    --accent: #fff;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  *, *::before, *::after { box-sizing: inherit; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: max(80px, env(safe-area-inset-top, 80px));
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  #search-wrap {
+    width: 100%;
+    max-width: 560px;
+    position: relative;
+  }
+
+  #search {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 18px;
+    padding: 14px 18px;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  #search::placeholder { color: var(--sub); }
+  #search:focus { border-color: #444; }
+
+  #results {
+    width: 100%;
+    max-width: 560px;
+    margin-top: 8px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    display: none;
+  }
+
+  #results.visible { display: block; }
+
+  .result {
+    display: flex;
+    align-items: center;
+    padding: 13px 18px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    text-decoration: none;
+    color: var(--text);
+    gap: 12px;
+    transition: background 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .result:last-child { border-bottom: none; }
+  .result:hover, .result:active { background: var(--hover); }
+
+  .result-name {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .result-sub {
+    font-size: 12px;
+    color: var(--sub);
+    margin-top: 1px;
+  }
+
+  .result.solo {
+    border-left: 2px solid #fff;
+  }
+
+  #empty {
+    display: none;
+    padding: 16px 18px;
+    color: var(--sub);
+    font-size: 14px;
+    background: var(--surface);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 560px;
+    margin-top: 8px;
+  }
+
+  #empty.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div id="search-wrap">
+  <input id="search" type="search" placeholder="Search apps…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+</div>
+<div id="results"></div>
+<div id="empty">No results</div>
+
+<script>
+const APPS = [
+  { name: "App Store",     scheme: "itms-apps://",                    web: "https://apps.apple.com" },
+  { name: "Audible",       scheme: "audible://",                      web: "https://www.audible.com" },
+  { name: "BAND",          scheme: "band://",                         web: "https://band.us" },
+  { name: "Calculator",    scheme: "calc://",                         web: null },
+  { name: "Calendar",      scheme: "calshow://",                      web: null },
+  { name: "Camera",        scheme: "camera://",                       web: null },
+  { name: "ChatGPT",       scheme: "chatgpt://",                      web: "https://chat.openai.com" },
+  { name: "Claude",        scheme: "claude://",                       web: "https://claude.ai" },
+  { name: "Clock",         scheme: "clock-alarm://",                  web: null },
+  { name: "Compass",       scheme: "compass://",                      web: null },
+  { name: "Contacts",      scheme: "contacts://",                     web: null },
+  { name: "FaceTime",      scheme: "facetime://",                     web: null },
+  { name: "Files",         scheme: "shareddocuments://",              web: null },
+  { name: "Find My",       scheme: "findmy://",                       web: null },
+  { name: "Fitness",       scheme: "x-apple-fitness-app://",         web: null },
+  { name: "Games",         scheme: "gamecenter://",                   web: null },
+  { name: "Gemini",        scheme: "gemini://",                       web: "https://gemini.google.com" },
+  { name: "GitHub",        scheme: "github://",                       web: "https://github.com" },
+  { name: "GD Browser",    scheme: null,                              web: "https://gdbrowser.com" },
+  { name: "Godot",         scheme: null,                              web: "https://editor.godotengine.org" },
+  { name: "Health",        scheme: "x-apple-health://",              web: null },
+  { name: "itch.io",       scheme: "itchio://",                       web: "https://itch.io" },
+  { name: "iMovie",        scheme: "imovie://",                       web: null },
+  { name: "KDE Connect",   scheme: "kdeconnect://",                   web: "https://kdeconnect.kde.org" },
+  { name: "Keynote",       scheme: "x-keynote-live://",               web: "https://www.icloud.com/keynote" },
+  { name: "Mail",          scheme: "mailto:",                         web: null },
+  { name: "Maps",          scheme: "maps://",                         web: "https://maps.apple.com" },
+  { name: "Measure",       scheme: "measure://",                      web: null },
+  { name: "Messages",      scheme: "sms://",                          web: null },
+  { name: "Notes",         scheme: "mobilenotes://",                  web: null },
+  { name: "Numbers",       scheme: "x-numbers-legacy://",             web: "https://www.icloud.com/numbers" },
+  { name: "Passwords",     scheme: "passwords://",                    web: null },
+  { name: "Phone",         scheme: "tel://",                          web: null },
+  { name: "Photos",        scheme: "photos-redirect://",              web: null },
+  { name: "Playground",    scheme: "swift-playgrounds://",            web: null },
+  { name: "Poki",          scheme: null,                              web: "https://poki.com" },
+  { name: "Preview",       scheme: null,                              web: null, note: "iPad only — no URL scheme" },
+  { name: "PvZ",           scheme: "pvz://",                          web: "https://www.ea.com/games/plants-vs-zombies" },
+  { name: "Reminders",     scheme: "x-apple-reminder://",             web: null },
+  { name: "Remote",        scheme: "remote://",                       web: null },
+  { name: "RetroArch",     scheme: "retroarch://",                    web: "https://www.retroarch.com" },
+  { name: "Safari",        scheme: "x-web-search://",                 web: null },
+  { name: "Settings",      scheme: "app-settings:",                   web: null },
+  { name: "Shortcuts",     scheme: "shortcuts://",                    web: null },
+  { name: "Siri",          scheme: "siri://",                         web: null },
+  { name: "Spotify",       scheme: "spotify://",                      web: "https://open.spotify.com" },
+  { name: "Steam",         scheme: "steam://",                        web: "https://store.steampowered.com" },
+  { name: "Translate",     scheme: "translate://",                    web: null },
+  { name: "TV",            scheme: "videos://",                       web: null },
+  { name: "Voice Memos",   scheme: "voicememos://",                   web: null },
+  { name: "Wallet",        scheme: "shoebox://",                      web: null },
+  { name: "Watch",         scheme: "itms-watch://",                   web: null },
+  { name: "Weather",       scheme: "weather://",                      web: null },
+];
+
+const input = document.getElementById('search');
+const results = document.getElementById('results');
+const empty = document.getElementById('empty');
+
+let autoTimer = null;
+
+function openApp(app) {
+  if (app.scheme) {
+    const start = Date.now();
+    window.location = app.scheme;
+    setTimeout(() => {
+      if (Date.now() - start < 1500) {
+        if (app.web) window.open(app.web, '_blank');
+      }
+    }, 800);
+  } else if (app.web) {
+    window.open(app.web, '_blank');
+  }
+}
+
+function render(query) {
+  clearTimeout(autoTimer);
+  const q = query.trim().toLowerCase();
+
+  if (!q) {
+    results.classList.remove('visible');
+    results.innerHTML = '';
+    empty.classList.remove('visible');
+    return;
+  }
+
+  const matches = APPS.filter(a => a.name.toLowerCase().includes(q));
+
+  results.innerHTML = '';
+  empty.classList.remove('visible');
+
+  if (matches.length === 0) {
+    results.classList.remove('visible');
+    empty.classList.add('visible');
+    return;
+  }
+
+  results.classList.add('visible');
+
+  if (matches.length === 1) {
+    autoTimer = setTimeout(() => openApp(matches[0]), 600);
+  }
+
+  matches.forEach((app, i) => {
+    const el = document.createElement('div');
+    el.className = 'result' + (matches.length === 1 ? ' solo' : '');
+
+    const canOpen = app.scheme || app.web;
+    const sub = app.note || (app.scheme ? 'App' : (app.web ? 'Web' : 'No link available'));
+
+    el.innerHTML = `
+      <div>
+        <div class="result-name">${app.name}</div>
+        <div class="result-sub">${sub}</div>
+      </div>
+    `;
+
+    if (canOpen) {
+      el.addEventListener('click', () => openApp(app));
+    } else {
+      el.style.opacity = '0.4';
+      el.style.cursor = 'default';
+    }
+
+    results.appendChild(el);
+  });
+}
+
+input.addEventListener('input', e => render(e.target.value));
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    input.value = '';
+    render('');
+    input.blur();
+  }
+});
+
+window.addEventListener('load', () => input.focus());
+</script>
+</body>
+</html>
